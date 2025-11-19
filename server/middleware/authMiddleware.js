@@ -1,10 +1,10 @@
-require('dotenv').config();
-const jwt = require('jsonwebtoken');
-const User = require('../models/userModel');
-
+import dotenv from 'dotenv';
+dotenv.config();
+import jwt from 'jsonwebtoken';
+import User from '../models/userModel.js';
 const JWT_SECRET = process.env.JWT_SECRET || 'devsecret';
 
-exports.protect = async (req, res, next) => {
+export const protect = async (req, res, next) => {
     try {
         let token = null;
         // check cookie or header

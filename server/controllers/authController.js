@@ -1,12 +1,14 @@
-require('dotenv').config();
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const User = require('../models/userModel');
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import User from '../models/userModel.js';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'devsecret';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
-exports.signup = async (req, res, next) => {
+export const signup = async (req, res, next) => {
     try {
         const { name, email, password } = req.body;
         if (!email || !password) return res.status(400).json({ message: 'Email and password required' });
@@ -26,7 +28,7 @@ exports.signup = async (req, res, next) => {
     }
 };
 
-exports.login = async (req, res, next) => {
+export const login = async (req, res, next) => {
     try {
         const { email, password } = req.body;
         if (!email || !password) return res.status(400).json({ message: 'Email and password required' });
@@ -45,7 +47,7 @@ exports.login = async (req, res, next) => {
     }
 };
 
-exports.logout = async (req, res) => {
+export const logout = async (req, res) => {
     res.clearCookie('token');
     res.json({ message: 'Logged out' });
 };

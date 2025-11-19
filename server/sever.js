@@ -1,10 +1,12 @@
-require('dotenv').config();
-const express = require('express');
-const cookieParser = require('cookie-parser');
-const cors = require('cors');
-const connectDB = require('./config/db');
-const authRoutes = require('./routes/authRoutes');
-const { errorHandler } = require('./middleware/errorMiddleware');
+import express from "express";
+import dotenv from "dotenv";
+import cors from "cors";
+import connectDB from "./config/db.js";
+import authRoutes from "./routes/authRoutes.js";
+import errorHandler from "./middleware/errorMiddleware.js";
+import cookieParser from "cookie-parser";
+
+dotenv.config();
 
 const app = express();
 
@@ -23,9 +25,10 @@ connectDB(MONGO_URI);
 // routes
 app.use('/api/auth', authRoutes);
 
-// health
-app.get('/api/ping', (req, res) => res.json({ ok: true }));
-
+// Health Check
+app.get("/api/health", (req, res) => {
+    res.json({ status: "OK", message: "Expo AI Backend Running" });
+});
 // error handler
 app.use(errorHandler);
 

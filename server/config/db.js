@@ -1,11 +1,13 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const connectDB = async (mongoUri) => {
     try {
         await mongoose.connect(mongoUri, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true
-        });
+          dbName: "Expo_AI",
+          useNewUrlParser: true,
+          useUnifiedTopology: true,
+        },
+      );
         console.log('MongoDB connected');
     } catch (err) {
         console.error('MongoDB connection failed:', err.message);
@@ -13,4 +15,4 @@ const connectDB = async (mongoUri) => {
     }
 };
 
-module.exports = connectDB;
+export default connectDB;
