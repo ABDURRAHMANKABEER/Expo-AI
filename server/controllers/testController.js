@@ -1,90 +1,269 @@
 import { Test } from "../models/Test.js";
 import { Question } from "../models/Question.js";
+import { openrouter } from "../utils/openrouter.js";
+
+/**
+ * CREATE TEST
+ * - Handles multiple uploads (images/PDFs)
+ * - Saves URLs from Cloudinary to test document
+ */
+
+// Lenient validator for AI-generated questions
+function validateQuestionsLenient(questions) {
+  for (const q of questions) {
+    // Must have question text
+    if (!q.questionText || q.questionText.trim().length < 10) return false;
+
+    // Must have options array with at least 2 items
+    if (!Array.isArray(q.options) || q.options.length < 2) return false;
+
+    // Exactly one option should be correct
+    const correctCount = q.options.filter(o => o.isCorrect).length;
+    if (correctCount !== 1) return false;
+
+    // All options must be non-empty strings
+    if (q.options.some(o => !o.option || o.option.trim() === "")) return false;
+
+    // Explanation must exist and be non-empty
+    if (!q.explanation || q.explanation.trim().length < 5) return false;
+
+    // Difficulty must be valid
+    if (!["easy", "medium", "hard"].includes(q.difficulty)) return false;
+  }
+
+  return true;
+};
 
 export const createTest = async (req, res) => {
   try {
-    const {
+    const { title, description, examType, organization, subject, additionalInfo, numQuestions } = req.body;
+
+    // Map uploaded files to Cloudinary URLs
+    const attachments = req.files || [];
+    const imageUrls = attachments
+      .filter(f => f.mimetype.startsWith("image"))
+      .map(f => f.path);
+    const pdfUrls = attachments
+      .filter(f => f.mimetype === "application/pdf")
+      .map(f => f.path);
+
+    const test = new Test({
       title,
       description,
       examType,
       organization,
       subject,
       additionalInfo,
-    } = req.body;
-
-    let attachment = {};
-
-    if (req.file) {
-      attachment = {
-        fileType: req.file.mimetype,
-        fileUrl: req.file.path,
-      };
-    }
-
-    const test = await Test.create({
-      title,
-      description,
-      examType,
-      organization,
-      subject,
-      additionalInfo,
-      attachment,
+      numQuestions: numQuestions || 10,
+      imageUrls,
+      pdfUrls,
+      user: req.user._id,
+      questions: [],
+      status: "pending"
     });
 
-    res.status(201).json({ message: "Test created", test });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    await test.save();
+    res.status(201).json({ message: "Test created successfully", test });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to create test", error: error.message });
   }
 };
 
-// Get test by ID with populated questions
+/**
+ * GET TEST BY ID
+ * - Populates questions
+ * - Only owner or admin can access
+ */
 export const getTestById = async (req, res) => {
   try {
-    const test = await Test.findById(req.params.id).populate("questions");
+    const { id } = req.params;
+    const test = await Test.findById(id).populate("questions");
 
     if (!test) return res.status(404).json({ message: "Test not found" });
 
-    res.json(test);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    // Optional: restrict to owner or admin
+    if (test.user.toString() !== req.user._id.toString() && req.user.role !== "admin") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    res.json({ test });
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching test", error: error.message });
   }
 };
 
-//Mock AI Generator (POST /tests/generate)
+/**
+ * GET TESTS CREATED BY LOGGED-IN USER
+ * - Optional pagination
+ */
+export const getTestsByUser = async (req, res) => {
+  try {
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const tests = await Test.find({ user: req.user._id })
+      .skip(skip)
+      .limit(limit)
+      .sort({ createdAt: -1 });
+
+    const total = await Test.countDocuments({ user: req.user._id });
+
+    res.json({
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      tests
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching user tests", error: error.message });
+  }
+};
+
+// ------------------------------------------------------
+// Generate Questions via OpenRouter (GPT-4.1-mini)
+// ------------------------------------------------------
 export const generateQuestions = async (req, res) => {
   try {
-    const { testId, numberOfQuestions } = req.body;
+    const { testId, additionalInfo } = req.body;
 
     const test = await Test.findById(testId);
     if (!test) return res.status(404).json({ message: "Test not found" });
 
-    const generatedQuestions = [];
+    const prompt = `
+You must generate EXACT, mathematically and logically correct aptitude questions for tests.
 
-    for (let i = 1; i <= numberOfQuestions; i++) {
-      const q = await Question.create({
-        testId,
-        questionText: `Mock question ${i} for ${test.title}`,
-        options: [
-          { option: "Option A", isCorrect: i % 4 === 0 },
-          { option: "Option B", isCorrect: i % 4 === 1 },
-          { option: "Option C", isCorrect: i % 4 === 2 },
-          { option: "Option D", isCorrect: i % 4 === 3 },
-        ],
-        explanation: "Mock explanation",
-      });
+RULES:
+1. Do NOT invent wrong answers.
+2. All calculations must be correct.
+3. All terms must be standard.
+4. Options MUST include exactly ONE correct answer.
+5. Explanations must match the correct answer.
+6. Difficulty rating must be accurate: 
+   - easy: simple arithmetic, simple sets
+   - medium: algebraic manipulation, basic patterns
+   - hard: multi-step reasoning, tricky logic
 
-      generatedQuestions.push(q._id);
+FORMAT STRICTLY:
+{
+  "questions": [
+    {
+      "questionText": "...",
+      "difficulty": "...",
+      "options": [
+        {"option": "...", "isCorrect": true},
+        {"option": "...", "isCorrect": false},
+        ...
+      ],
+      "explanation": "...",
+      "metadata": {
+        "topic": "...",
+        "subtopic": "...",
+        "marks": 1
+      }
     }
+  ]
+}
 
-    await Test.findByIdAndUpdate(testId, {
-      $push: { questions: { $each: generatedQuestions } },
+DON'T include anything else outside JSON.
+
+Do NOT add markdown or commentary. Return JSON ONLY.
+
+Exam Details:
+- Type: ${test.examType}
+- Organization: ${test.organization}
+- Additional Info: ${test.additionalInfo || "None"}
+
+User Uploaded Extras:
+- Image URLs: ${JSON.stringify(test.imageUrls || [])}
+- PDF URLs: ${JSON.stringify(test.pdfUrls || [])}
+
+Extra Info Passed Now:
+${additionalInfo || "None"}
+
+Generate at least ${test.numQuestions || 10} questions.
+    `;
+
+    // Call OpenRouter
+    const response = await openrouter.post("/chat/completions", {
+      model: "mistralai/mistral-nemo",
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: "Return STRICT JSON. No markdown." },
+        { role: "user", content: prompt }
+      ]
     });
+
+    const aiJSON = response.data.choices[0].message.content;
+    const parsed = JSON.parse(aiJSON);
+
+        // Run lenient validator
+    if (!validateQuestionsLenient(parsed.questions)) {
+      return res.status(400).json({ message: "Some questions are structurally invalid. Try regenerating." });
+    };
+
+    // Insert into DB
+    const questionDocs = await Question.insertMany(
+      parsed.questions.map((q) => ({
+        testId,
+        questionText: q.questionText,
+        options: q.options,
+        explanation: q.explanation,
+        difficulty: q.difficulty,
+        metadata: q.metadata
+      }))
+    );
+
+    test.questions = questionDocs.map((q) => q._id);
+    test.status = "generated";
+    await test.save();
 
     res.json({
-      message: "Mock questions generated",
-      questions: generatedQuestions,
+      message: "Questions generated successfully",
+      count: questionDocs.length,
+      questions: questionDocs
     });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch (error) {
+    console.error("AI ERROR:", error);
+    res.status(500).json({
+      message: "Failed to generate questions",
+      error: error.message
+    });
+  }
+};
+
+// ------------------------------------------------------
+// Pagination: Get Questions of a Test
+// ------------------------------------------------------
+export const getTestQuestions = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const test = await Test.findById(id).populate({
+      path: "questions",
+      options: { skip, limit }
+    });
+
+    if (!test) return res.status(404).json({ message: "Test not found" });
+
+    const totalCount = await Question.countDocuments({ testId: id });
+
+    res.json({
+      total: totalCount,
+      page,
+      limit,
+      totalPages: Math.ceil(totalCount / limit),
+      questions: test.questions
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error fetching paginated questions",
+      error: error.message
+    });
   }
 };

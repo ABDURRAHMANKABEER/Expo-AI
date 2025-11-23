@@ -2,18 +2,22 @@ import mongoose from "mongoose";
 
 const testSchema = new mongoose.Schema(
   {
-    title: { type: String, required: true }, 
+    title: { type: String, required: true },
     description: { type: String },
-    examType: { type: String }, // UTME, WAEC, Scholarship, Job Aptitude etc.
-    organization: { type: String }, // Shell, PTDF, Access Bank, Chevron...
-    subject: { type: String }, // Math, English, General Test, etc.
 
-    additionalInfo: { type: String }, // Any extra user text for better AI generation
+    examType: { type: String }, 
+    organization: { type: String },
+    subject: { type: String },
 
-    attachment: {
-      fileType: { type: String }, // image/pdf
-      fileUrl: { type: String },  // cloudinary link
-    },
+    additionalInfo: { type: String },
+
+    // Support multiple images/PDFs
+    attachments: [
+      {
+        fileType: { type: String },  // "image", "pdf"
+        fileUrl: { type: String },   // cloudinary URL
+      }
+    ],
 
     questions: [
       {

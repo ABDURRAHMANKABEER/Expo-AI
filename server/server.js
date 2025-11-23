@@ -5,6 +5,7 @@ import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
 import errorHandler from "./middleware/errorMiddleware.js";
 import cookieParser from "cookie-parser";
+import testRoutes from "./routes/testRoutes.js";
 
 dotenv.config();
 
@@ -24,6 +25,7 @@ connectDB(MONGO_URI);
 
 // routes
 app.use('/api/auth', authRoutes);
+app.use('/api/tests', testRoutes);
 
 // Health Check
 app.get("/api/health", (req, res) => {
