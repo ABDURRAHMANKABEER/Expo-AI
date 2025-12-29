@@ -1,9 +1,12 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const signToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || "7d",
+    expiresIn: process.env.JWT_EXPIRES_IN || "30d",
   });
 };
 
@@ -48,6 +51,7 @@ export const login = async (req, res) => {
       return res.status(400).json({ success: false, message: "Email and password required" });
 
     const user = await User.findOne({ email }).select("+password");
+    console.log("User found:", user);
     if (!user) return res.status(401).json({ success: false, message: "Invalid credentials" });
 
     const isMatch = await user.comparePassword(password);

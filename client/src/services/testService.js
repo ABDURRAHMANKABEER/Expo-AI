@@ -1,17 +1,54 @@
-import api from './api';
+import api from "./api";
 
-const testService = {
-  async createTest(data) {
-    return api.post('/tests', data).then(res => res.data);
-  },
-
-  async getTestById(id) {
-    return api.get(`/tests/${id}`).then(res => res.data);
-  },
-
-  async generateQuestions(payload) {
-    return api.post('/tests/generate', payload).then(res => res.data);
-  },
+/**
+ * createTest(payload)
+ * Expects backend to return: { message, test }
+ */
+export const createTest = async (payload) => {
+  const token = localStorage.getItem("token");
+  const res = await api.post("/api/tests", payload, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return res.data; // { message, test }
 };
 
-export default testService;
+/**
+ * generateTest(payload)
+ * backend blocks until generation completes and returns the generated test or a success message.
+ * We'll send { testId } if available. Some servers may accept full metadata too.
+ */
+export const generateTestQuestions = async (payload) => {
+  const token = localStorage.getItem("token");
+  const res = await api.post("/api/tests/generate", payload, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return res.data;
+};
+
+/**
+ * getTestById(id)
+ * Returns populated Test object (with questions array).
+ */
+export const getTestById = async (id) => {
+  const token = localStorage.getItem("token");
+  const res = await api.get(`/api/tests/${id}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return res.data;
+};
+
+/**
+ * getTestQuestions(testId, page=1, limit=1)
+ */
+export const getTestQuestions = async (testId, page = 1, limit = 1) => {
+  const res = await api.get(
+    `/api/tests/${testId}/questions?page=${page}&limit=${limit}`
+  );
+  return res.data;
+};

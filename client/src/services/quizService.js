@@ -1,13 +1,37 @@
-import api from './api';
+import api from "./api";
 
-const quizService = {
-  submitQuiz(testId, answers) {
-    return api.post(`/quiz/${testId}/submit`, { answers }).then(res => res.data);
-  },
-
-  getResult(testId) {
-    return api.get(`/quiz/${testId}/result`).then(res => res.data);
-  },
+/**
+ * submitQuiz(payload)
+ * payload: { testId, answers: [{ questionId, selectedIndex, userAnswer }], timeTaken? }
+ * backend returns:
+ * {
+ *   message,
+ *   totalQuestions,
+ *   correct,
+ *   incorrect,
+ *   score,
+ *   details,
+ *   attemptId
+ * }
+ */
+export const submitQuiz = async (payload) => {
+  const res = await api.post("/api/quiz/submit", payload);
+  return res.data;
 };
 
-export default quizService;
+export const getResults = async (attemptId) => {
+  const url = attemptId
+    ? `/api/quiz/results?attemptId=${attemptId}`
+    : `/api/quiz/results`;
+
+  const res = await api.get(url);
+  return res.data;
+};
+
+// Get previous quiz attempts
+export const getPreviousAttempts = async (page = 1, limit = 10) => {
+  const res = await api.get(
+    `/api/quiz/previous?page=${page}&limit=${limit}`
+  );
+  return res.data;
+};

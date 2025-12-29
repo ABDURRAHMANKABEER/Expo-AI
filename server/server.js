@@ -7,6 +7,7 @@ import errorHandler from "./middleware/errorMiddleware.js";
 import cookieParser from "cookie-parser";
 import testRoutes from "./routes/testRoutes.js";
 import quizRoutes from "./routes/quizRoutes.js";
+import morgan from "morgan";
 
 dotenv.config();
 
@@ -18,6 +19,7 @@ app.use(cors({
     origin: process.env.CLIENT_URL || 'http://localhost:5173',
     credentials: true
 }));
+app.use(morgan('dev'));
 
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/expoai';

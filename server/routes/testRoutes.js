@@ -2,7 +2,8 @@ import express from "express";
 import { 
   createTest, 
   getTestById, 
-  generateQuestions 
+  generateQuestions ,
+  getTestQuestions
 } from "../controllers/testController.js";
 
 import uploadMiddleware from "../middleware/uploadMiddleware.js";
@@ -24,17 +25,19 @@ router.post(
 );
 
 /**
- * GET TEST BY ID (with questions)
- * - Protected: only authenticated users can fetch their tests (or admins)
- */
-router.get("/:id", protect, getTestById);
-
-/**
  * GENERATE QUESTIONS (AI)
  * - Protected: user must be logged in
  * - Body: { testId, additionalInfo }
  * - Optional: uncomment roleAuth to restrict to admins only
  */
 router.post("/generate", protect, /* roleAuth('admin'), */ generateQuestions);
+
+router.get("/:id/questions", protect, getTestQuestions);
+
+/**
+ * GET TEST BY ID (with questions)
+ * - Protected: only authenticated users can fetch their tests (or admins)
+ */
+router.get("/:id", protect, getTestById);
 
 export default router;

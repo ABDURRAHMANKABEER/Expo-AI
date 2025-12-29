@@ -1,5 +1,8 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 export const protect = async (req, res, next) => {
   let token;
@@ -22,7 +25,7 @@ export const protect = async (req, res, next) => {
 
     next();
   } catch (error) {
-    return res.status(401).json({ success: false, message: "Invalid token" });
+    return res.status(401).json({ success: false, message: "Invalid token" , error});
   }
 };
 

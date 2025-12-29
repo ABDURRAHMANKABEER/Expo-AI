@@ -2,12 +2,12 @@ import api from './api';
 
 const authService = {
   async signup(data) {
-    const res = await api.post('/auth/signup', data);
+    const res = await api.post('/api/auth/signup', data);
     return res.data;
   },
 
   async login(data) {
-    const res = await api.post('/auth/login', data);
+    const res = await api.post('/api/auth/login', data);
 
     if (res.data?.token) {
       localStorage.setItem('token', res.data.token);

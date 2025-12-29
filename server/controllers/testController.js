@@ -7,33 +7,6 @@ import { openrouter } from "../utils/openrouter.js";
  * - Handles multiple uploads (images/PDFs)
  * - Saves URLs from Cloudinary to test document
  */
-
-// Lenient validator for AI-generated questions
-function validateQuestionsLenient(questions) {
-  for (const q of questions) {
-    // Must have question text
-    if (!q.questionText || q.questionText.trim().length < 10) return false;
-
-    // Must have options array with at least 2 items
-    if (!Array.isArray(q.options) || q.options.length < 2) return false;
-
-    // Exactly one option should be correct
-    const correctCount = q.options.filter(o => o.isCorrect).length;
-    if (correctCount !== 1) return false;
-
-    // All options must be non-empty strings
-    if (q.options.some(o => !o.option || o.option.trim() === "")) return false;
-
-    // Explanation must exist and be non-empty
-    if (!q.explanation || q.explanation.trim().length < 5) return false;
-
-    // Difficulty must be valid
-    if (!["easy", "medium", "hard"].includes(q.difficulty)) return false;
-  }
-
-  return true;
-};
-
 export const createTest = async (req, res) => {
   try {
     const { title, description, examType, organization, subject, additionalInfo, numQuestions } = req.body;
@@ -83,7 +56,10 @@ export const getTestById = async (req, res) => {
     if (!test) return res.status(404).json({ message: "Test not found" });
 
     // Optional: restrict to owner or admin
-    if (test.user.toString() !== req.user._id.toString() && req.user.role !== "admin") {
+    if (test.user && 
+      test.user.toString() !== req.user._id.toString() &&
+      req.user.role !== "admin"
+    ) {
       return res.status(403).json({ message: "Forbidden" });
     }
 
@@ -199,11 +175,6 @@ Generate at least ${test.numQuestions || 10} questions.
     const aiJSON = response.data.choices[0].message.content;
     const parsed = JSON.parse(aiJSON);
 
-        // Run lenient validator
-    if (!validateQuestionsLenient(parsed.questions)) {
-      return res.status(400).json({ message: "Some questions are structurally invalid. Try regenerating." });
-    };
-
     // Insert into DB
     const questionDocs = await Question.insertMany(
       parsed.questions.map((q) => ({
@@ -218,7 +189,14 @@ Generate at least ${test.numQuestions || 10} questions.
 
     test.questions = questionDocs.map((q) => q._id);
     test.status = "generated";
-    await test.save();
+    await Test.findByIdAndUpdate(
+      testId,
+      {
+        questions: questionDocs.map((q) => q._id),
+        status: "generated"
+      },
+      { new: true }
+    );
 
     res.json({
       message: "Questions generated successfully",
@@ -241,28 +219,37 @@ export const getTestQuestions = async (req, res) => {
   try {
     const { id } = req.params;
     const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+    const limit = Number(req.query.limit) || 1;
 
-    const test = await Test.findById(id).populate({
-      path: "questions",
-      options: { skip, limit }
+    const test = await Test.findById(id).select("questions");
+    if (!test) {
+      return res.status(404).json({ message: "Test not found" });
+    }
+
+    const totalQuestions = test.questions.length;
+
+    const safePage = Math.min(page, totalQuestions || 1);
+    const skip = (safePage - 1) * limit;
+
+    // slice the question IDs first (IMPORTANT)
+    const questionIds = test.questions.slice(skip, skip + limit);
+
+    // then fetch the actual question documents
+    const questions = await Question.find({
+      _id: { $in: questionIds }
+    }).sort({
+      _id: 1
     });
-
-    if (!test) return res.status(404).json({ message: "Test not found" });
-
-    const totalCount = await Question.countDocuments({ testId: id });
 
     res.json({
-      total: totalCount,
-      page,
-      limit,
-      totalPages: Math.ceil(totalCount / limit),
-      questions: test.questions
+      totalQuestions,
+      currentQuestion: safePage,
+      questions
     });
   } catch (error) {
+    console.error(error);
     res.status(500).json({
-      message: "Error fetching paginated questions",
+      message: "Error fetching test questions",
       error: error.message
     });
   }
