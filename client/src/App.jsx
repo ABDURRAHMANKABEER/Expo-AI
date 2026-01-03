@@ -12,6 +12,7 @@ import VerticalNavbar from './components/VerticalNavbar';
 import PrivateRoute from './components/PrivateRoute';
 import Generating from './pages/Generating';
 import Footer from './pages/Footer';
+import './App.css';
 
 export default function App() {
   return (
