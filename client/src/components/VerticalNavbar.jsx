@@ -55,7 +55,7 @@ export default function VerticalNavbar() {
           {/* Logo */}
           <div className="px-6 mb-8">
             <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100">
-              PrepMaster
+              EXPO-AI
             </h1>
             {isLoggedIn && (
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -138,7 +138,7 @@ export default function VerticalNavbar() {
             </button>
 
             <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-              © 2025 PrepMaster
+              © 2025 Expo-AI
             </div>
           </div>
         </div>
